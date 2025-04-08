@@ -1,8 +1,10 @@
+from data.usuarios import usuarios_db
+
 def verificar_login(usuario, senha):
     try:
-        if(usuario == 'adm' and senha == 'adm' ):
-            print("Login efetuado com sucesso")
-        else: 
-            print("Tente novamente...")
-    except:
-        usuario
+        for user in usuarios_db:
+            if user["login"] == usuario and user["senha"] == senha:
+                return {"sucesso": True, "mensagem": "Login efetuado com sucesso"}
+        return {"sucesso": False, "erros": ["Usuário ou senha inválidos"]}
+    except Exception as e:
+        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}

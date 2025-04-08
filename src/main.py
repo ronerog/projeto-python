@@ -14,7 +14,13 @@ def inicio():
     if(entrada == 1):
         usuario = input("Coloque seu usuário: ")
         senha = input("Coloque sua senha: ")
-        login = verificar_login(usuario, senha)
+        resultado = verificar_login(usuario, senha)
+        if resultado["sucesso"] is False:
+             for erro in resultado["erros"]:
+                print(f"Erro: {erro}")
+        else:
+            print("Login Efetuado")
+            # CONTINUAR LOGICA, CHAMAR MENU DE PRODUTOS
     elif(entrada == 2):
         usuario = input("Registre seu usuário: ")
         senha = input("Registre sua senha: ")
