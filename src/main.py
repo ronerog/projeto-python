@@ -18,7 +18,12 @@ def inicio():
     elif(entrada == 2):
         usuario = input("Registre seu usuário: ")
         senha = input("Registre sua senha: ")
-        cadastrar(usuario, senha)
+        resultado = cadastrar(usuario, senha)
+        if resultado["sucesso"] is False:
+             for erro in resultado["erros"]:
+                print(f"Erro: {erro}")
+        else:
+            print("Cadastrado com sucesso")
     else:
         print("Digite 1 para login ou 2 para cadastrar")
 inicio()
