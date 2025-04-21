@@ -1,4 +1,5 @@
 from data.produtos import produtos_db
+import re
 
 def validacao_produto(nome, preco):
     erros = []
@@ -7,6 +8,9 @@ def validacao_produto(nome, preco):
 
     if not nome or len(nome) < 2:
         erros.append("Nome do produto não pode ter menos de 2 caracteres")
+    
+    if re.search(r'\s{2,}', nome):
+        erros.append("Nome do produto não pode conter espaços em branco consecutivos")
     
     try:
         preco_float = float(preco)
@@ -65,7 +69,8 @@ def editar_produto(id, nome=None, preco=None):
                     for p in produtos_db:
                         if p['nome'] == nome and p['id'] != id:
                             erros.append("Já existe um produto com este nome")
-                
+                        if re.search(r'\s{2,}', nome):
+                            erros.append("Nome do produto não pode conter espaços em branco consecutivos")
                 if preco:
                     try:
                         preco_float = float(preco)
