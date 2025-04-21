@@ -6,12 +6,12 @@ def inicio():
     login = False
     
     while True:
-        print("\nMenu Inicial")
-        print("_________________________________________")
-        print("Aperte 1 para Login")
-        print("Aperte 2 para se Cadastrar")
-        print("Aperte 0 para Sair")
-        print("_________________________________________")
+        print("\n___________ MENU INICIAL ___________")
+        print("-----------------------------------")
+        print("1. Entrar")
+        print("2. Cadastrar")
+        print("0. Sair")
+        print("-----------------------------------")
         
         try:
             entrada = int(input("Escolha uma opção: "))
@@ -29,7 +29,7 @@ def inicio():
                     for erro in resultado["erros"]:
                         print(f"Erro: {erro}")
                 else:
-                    print("Login Efetuado com Sucesso!")
+                    print("\nLogin Efetuado com Sucesso!")
                     menu_produtos_logado()
                         
             elif entrada == 2:
@@ -41,7 +41,7 @@ def inicio():
                     for erro in resultado["erros"]:
                         print(f"Erro: {erro}")
                 else:
-                    print("Cadastrado com sucesso")
+                    print("\nCadastrado com sucesso")
             else:
                 print("Digite 1 para login, 2 para cadastrar ou 0 para sair")
                 
@@ -62,7 +62,7 @@ def menu_produtos_logado():
             opcao = int(input('Selecione uma opção: '))
             
             if opcao == 0:
-                print("Voltando ao menu principal...")
+                print("\nVoltando ao menu principal...")
                 break
             elif opcao == 1:
                 resultado = listar_todos_produtos()
@@ -78,14 +78,16 @@ def menu_produtos_logado():
                     print(f"ID: {produto['id']}")
                     print(f"Nome: {produto['nome']}")
                     print(f"Preço: R$ {produto['preco']:.2f}")
+                    print(f"Quantidade: {produto['quantidade']} unidade(s)")
                 else:
                     for erro in resultado["erros"]:
                         print(f"Erro: {erro}")
             elif opcao == 3:
                 nome = input("Digite o nome do novo produto: ")
                 preco = input("Digite o preço do produto: ")
+                quantidade = input("Digite a quantidade do produto: ")
                 
-                resultado = cadastrar_produto(nome, preco)
+                resultado = cadastrar_produto(nome, preco, quantidade)
                 if resultado["sucesso"]:
                     print(resultado["mensagem"])
                 else:
@@ -95,8 +97,9 @@ def menu_produtos_logado():
                 id_produto = int(input("Digite o ID do produto que deseja editar: "))
                 nome = input("Novo nome (deixe em branco para manter o atual): ")
                 preco = input("Novo preço (deixe em branco para manter o atual): ")
+                quantidade = input("Nova quantidade (deixe em branco para manter o atual): ")
                 
-                resultado = editar_produto(id_produto, nome, preco)
+                resultado = editar_produto(id_produto, nome, preco, quantidade)
                 if resultado["sucesso"]:
                     print(resultado["mensagem"])
                 else:

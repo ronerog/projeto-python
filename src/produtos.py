@@ -1,7 +1,7 @@
 from data.produtos import produtos_db
 import re
 
-def validacao_produto(nome, preco):
+def validacao_produto(nome, preco, quantidade):
     erros = []
     if nome.isdigit():
         erros.append("Nome do produto deve ser uma string")
@@ -19,11 +19,18 @@ def validacao_produto(nome, preco):
     except ValueError:
         erros.append("Preço deve ser um valor numérico válido")
     
+    try:
+        quatidade_int = int(quantidade)
+        if quatidade_int < 0:
+            erros.append("Quantidade deve ser maior ou igual a zero")
+    except ValueError:
+        erros.append("Quantidade deve ser um valor inteiro válido")
+
     return erros
 
-def cadastrar_produto(nome, preco):
+def cadastrar_produto(nome, preco, quantidade):
     try:
-        erros = validacao_produto(nome, preco)
+        erros = validacao_produto(nome, preco, quantidade)
         
         # AQUI COLOCAMOS CASO JA EXISTA UM PRODUTO COM MESMO NOME, POIS NAO TEMOS DIFERENCIACAO COMO MARCA ETC.
         for produto in produtos_db:
@@ -40,10 +47,11 @@ def cadastrar_produto(nome, preco):
         produto = {
             'id': proximo_id,
             'nome': nome,
-            'preco': float(preco)
+            'preco': float(preco),
+            'quantidade': quantidade
         }
         produtos_db.append(produto)
-        return {"sucesso": True, "mensagem": "Produto cadastrado com sucesso"}
+        return {"sucesso": True, "mensagem": "\nProduto cadastrado com sucesso"}
     
     except Exception as e:
         return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
@@ -53,12 +61,12 @@ def excluir_produto(nome):
         for i, produto in enumerate(produtos_db):
             if produto['nome'] == nome:
                 produtos_db.pop(i)
-                return {"sucesso": True, "mensagem": "Produto excluído com sucesso"}
+                return {"sucesso": True, "mensagem": "\nProduto excluído com sucesso"}
         return {"sucesso": False, "erros": ["Produto não encontrado"]}
     except Exception as e:
         return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
 
-def editar_produto(id, nome=None, preco=None):
+def editar_produto(id, nome=None, preco=None, quantidade=None):
     try:
         for i, produto in enumerate(produtos_db):
             if produto['id'] == id:
@@ -79,6 +87,14 @@ def editar_produto(id, nome=None, preco=None):
                     except ValueError:
                         erros.append("Preço inválido")
                 
+                if quantidade:
+                    try:
+                        quatidade_int = int(quantidade)
+                        if quatidade_int <= 0:
+                            erros.append("Quantidade deve ser maior ou igual a zero")
+                    except ValueError:
+                        erros.append("Quantidade inválida")
+                
                 if erros:
                     return {"sucesso": False, "erros": erros}
                 
@@ -86,11 +102,13 @@ def editar_produto(id, nome=None, preco=None):
                     produtos_db[i]['nome'] = nome
                 if preco:
                     produtos_db[i]['preco'] = float(preco)
+                if quantidade:
+                    produtos_db[i]['quantidade'] = int(quantidade)
                 
-                if not nome and not preco:
+                if not nome and not preco and not quantidade:
                     return {"sucesso": False, "erros": ["Nenhuma alteração realizada"]}
                     
-                return {"sucesso": True, "mensagem": "Produto atualizado com sucesso"}
+                return {"sucesso": True, "mensagem": "\nProduto atualizado com sucesso"}
         return {"sucesso": False, "erros": ["Produto não encontrado"]}
     except Exception as e:
         return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
@@ -114,16 +132,16 @@ def listar_todos_produtos():
         if not produtos_db:
             return {"sucesso": False, "erros": ["Nenhum produto cadastrado"]}
         
-        print("\n===== LISTA DE PRODUTOS =====")
-        print("ID  | NOME                | PREÇO")
-        print("-----------------------------------")
+        print("\n=============== LISTA DE PRODUTOS ===============")
+        print("ID | NOME       | PREÇO  | QUANTIDADE(unidade(s))")
+        print("-------------------------------------------------")
         
         for produto in produtos_db:
             nome_formatado = produto['nome']
             preco_formatado = f"R$ {produto['preco']:.2f}"
-            print(f"{produto['id']}| {nome_formatado} | {preco_formatado}")
+            print(f"{produto['id']}| {nome_formatado} | {preco_formatado} | {produto['quantidade']}")
         
-        print("===========================\n")
+        print("=================================================\n")
         return {"sucesso": True, "mensagem": f"Total de {len(produtos_db)} produtos listados"}
     
     except Exception as e:
