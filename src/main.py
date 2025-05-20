@@ -1,6 +1,6 @@
-from login import verificar_login
-from cadastro import cadastrar
-from produtos import listar_todos_produtos, buscar_produto, editar_produto, excluir_produto, cadastrar_produto
+from services.login_service import verificar_login
+from services.cadastro_service import cadastrar
+from services.produtos_service import listar_todos_produtos, buscar_produto, editar_produto, excluir_produto, cadastrar_produto
 
 def inicio():
     login = False
