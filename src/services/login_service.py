@@ -1,10 +1,30 @@
-from data.usuarios import usuarios_db
+import bcrypt
+from data.conexao_banco import criar_conexao
 
 def verificar_login(usuario, senha):
     try:
-        for user in usuarios_db:
-            if user["login"] == usuario and user["senha"] == senha:
-                return {"sucesso": True, "mensagem": "Login efetuado com sucesso"}
-        return {"sucesso": False, "erros": ["Usuário ou senha inválidos"]}
+        conn = criar_conexao()
+        if conn is None:
+            return {"sucesso": False, "erros": ["Erro ao conectar ao banco"]}
+
+        cur = conn.cursor()
+        cur.execute("SELECT senha FROM usuarios WHERE login = %s", (usuario,))
+        resultado = cur.fetchone()
+
+        if resultado is None:
+            return {"sucesso": False, "erros": ["Usuário ou senha inválidos"]}
+
+        senha_hash = resultado[0]
+        if bcrypt.checkpw(senha.encode('utf-8'), senha_hash.encode('utf-8')):
+            return {"sucesso": True, "mensagem": "Login efetuado com sucesso"}
+        else:
+            return {"sucesso": False, "erros": ["Usuário ou senha inválidos"]}
+
     except Exception as e:
         return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
+
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()

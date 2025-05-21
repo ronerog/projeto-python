@@ -1,149 +1,228 @@
-from data.produtos import produtos_db
-import re
+import psycopg2
+from data.conexao_banco import criar_conexao
 
-def validacao_produto(nome, preco, quantidade):
-    erros = []
-    if nome.isdigit():
-        erros.append("Nome do produto deve ser uma string")
-
-    if not nome or len(nome) < 2:
-        erros.append("Nome do produto não pode ter menos de 2 caracteres")
-    
-    if re.search(r'\s{2,}', nome):
-        erros.append("Nome do produto não pode conter espaços em branco consecutivos")
-    
+def validacao_produto(produto):
+    if not produto.get('nome'):
+        return {'sucesso': False, 'mensagem': "O campo nome é obrigatório."}
+    if not isinstance(produto.get('nome'), str) or produto['nome'].strip() == "":
+        return {'sucesso': False, 'mensagem': "O nome do produto não pode ser vazio."}
+    if 'preco_venda' not in produto:
+        return {'sucesso': False, 'mensagem': "O campo preco_venda é obrigatório."}
     try:
-        preco_float = float(preco)
-        if preco_float <= 0:
-            erros.append("Preço deve ser maior que zero")
-    except ValueError:
-        erros.append("Preço deve ser um valor numérico válido")
+        preco = float(produto['preco_venda'])
+    except (ValueError, TypeError):
+        return {'sucesso': False, 'mensagem': "O campo preco_venda deve ser um número."}
+    if preco < 0:
+        return {'sucesso': False, 'mensagem': "O preco_venda não pode ser negativo."}
+    return {'sucesso': True}
+
+def validacao_produto(produto):
+    if not produto.get('nome'):
+        return {'sucesso': False, 'mensagem': "O campo nome é obrigatório."}
+    if not isinstance(produto.get('nome'), str) or produto['nome'].strip() == "":
+        return {'sucesso': False, 'mensagem': "O nome do produto não pode ser vazio."}
+    if 'preco_venda' not in produto:
+        return {'sucesso': False, 'mensagem': "O campo preco_venda é obrigatório."}
+    try:
+        preco = float(produto['preco_venda'])
+    except (ValueError, TypeError):
+        return {'sucesso': False, 'mensagem': "O campo preco_venda deve ser um número."}
+    if preco < 0:
+        return {'sucesso': False, 'mensagem': "O preco_venda não pode ser negativo."}
     
-    try:
-        quatidade_int = int(quantidade)
-        if quatidade_int < 0:
-            erros.append("Quantidade deve ser maior ou igual a zero")
-    except ValueError:
-        erros.append("Quantidade deve ser um valor inteiro válido")
+    if 'quantidade' in produto:
+        try:
+            qtd = int(produto['quantidade'])
+        except (ValueError, TypeError):
+            return {'sucesso': False, 'mensagem': "O campo quantidade deve ser um número inteiro."}
+        if qtd < 0:
+            return {'sucesso': False, 'mensagem': "A quantidade não pode ser negativa."}
 
-    return erros
+    return {'sucesso': True}
 
-def cadastrar_produto(nome, preco, quantidade):
+def cadastrar_produto(produto):
+    validacao = validacao_produto(produto)
+    if not validacao['sucesso']:
+        return validacao
+
+    conn = None
+    cursor = None
     try:
-        erros = validacao_produto(nome, preco, quantidade)
-        
-        # AQUI COLOCAMOS CASO JA EXISTA UM PRODUTO COM MESMO NOME, POIS NAO TEMOS DIFERENCIACAO COMO MARCA ETC.
-        for produto in produtos_db:
-            if produto["nome"] == nome:
-                erros.append("Produto com este nome já existe")
-        
-        if erros:
-            return {"sucesso": False, "erros": erros}
-            
-        proximo_id = 1
-        if produtos_db:
-            proximo_id = max(produto['id'] for produto in produtos_db) + 1
-        
-        produto = {
-            'id': proximo_id,
-            'nome': nome,
-            'preco': float(preco),
-            'quantidade': quantidade
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO produtos (nome, preco_venda)
+            VALUES (%s, %s) RETURNING produto_id;
+        """
+        cursor.execute(query, (produto['nome'], produto['preco_venda']))
+        produto_id = cursor.fetchone()[0]
+
+        query_entrada = """
+            INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo)
+            VALUES (%s, %s, %s);
+        """
+        cursor.execute(query_entrada, (
+            produto_id,
+            produto['quantidade'],
+            produto['preco_venda']
+        ))
+
+        conn.commit()
+        return {
+            'sucesso': True,
+            'mensagem': "Produto cadastrado com sucesso.",
+            'produto_id': produto_id
         }
-        produtos_db.append(produto)
-        return {"sucesso": True, "mensagem": "\nProduto cadastrado com sucesso"}
+
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao cadastrar o produto: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def excluir_produto(produto_id):
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        cursor.execute("SELECT nome FROM produtos WHERE produto_id = %s;", (produto_id,))
+        resultado = cursor.fetchone()
+        if not resultado:
+            return {'sucesso': False, 'mensagem': "Produto não encontrado."}
+        nome_produto = resultado[0]
+        cursor.execute("DELETE FROM produtos WHERE produto_id = %s;", (produto_id,))
+        conn.commit()
+        return {'sucesso': True, 'mensagem': f"Produto '{nome_produto}' excluído com sucesso."}
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao excluir o produto: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def editar_produto(produto_id, novos_dados):
+    if not novos_dados:
+        return {'sucesso': False, 'mensagem': "Nenhum dado para atualizar."}
+
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM produtos WHERE produto_id = %s;", (produto_id,))
+        if not cursor.fetchone():
+            return {'sucesso': False, 'mensagem': "Produto não encontrado."}
+
+        campos = []
+        valores = []
+        if 'nome' in novos_dados:
+            campos.append("nome = %s")
+            valores.append(novos_dados['nome'])
+        if 'preco_venda' in novos_dados:
+            try:
+                preco = float(novos_dados['preco_venda'])
+                if preco < 0:
+                    return {'sucesso': False, 'mensagem': "O preco_venda não pode ser negativo."}
+                campos.append("preco_venda = %s")
+                valores.append(preco)
+            except (ValueError, TypeError):
+                return {'sucesso': False, 'mensagem': "O campo preco_venda deve ser um número válido."}
+
+        if campos:
+            valores.append(produto_id)
+            query = f"UPDATE produtos SET {', '.join(campos)} WHERE produto_id = %s;"
+            cursor.execute(query, tuple(valores))
+
+        if 'quantidade' in novos_dados:
+            quantidade = int(novos_dados['quantidade'])
+            if quantidade < 0:
+                return {'sucesso': False, 'mensagem': "A quantidade não pode ser negativa."}
+            cursor.execute("""
+                INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo)
+                VALUES (%s, %s, 0);
+            """, (produto_id, quantidade))
+
+        conn.commit()
+        return {'sucesso': True, 'mensagem': "Produto atualizado com sucesso."}
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao atualizar o produto: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def buscar_produto(nome):
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        query = """
+            SELECT p.produto_id, p.nome, p.preco_venda, COALESCE(SUM(e.quantidade), 0) AS quantidade
+            FROM produtos p
+            LEFT JOIN entrada_produtos e ON p.produto_id = e.produto_id
+            WHERE p.nome ILIKE %s
+            GROUP BY p.produto_id, p.nome, p.preco_venda;
+        """
+        cursor.execute(query, (f'%{nome}%',))
+        rows = cursor.fetchall()
+        if not rows:
+            return {'sucesso': False, 'mensagem': "Produto não encontrado."}
     
-    except Exception as e:
-        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
+        produtos = []
+        for row in rows:
+            produtos.append({
+                'produto_id': row[0],
+                'nome': row[1],
+                'preco_venda': float(row[2]),
+                'quantidade': int(row[3])
+            })
+        return {'sucesso': True, 'produtos': produtos}
 
-def excluir_produto(nome):
-    try:
-        for i, produto in enumerate(produtos_db):
-            if produto['nome'] == nome:
-                produtos_db.pop(i)
-                return {"sucesso": True, "mensagem": "\nProduto excluído com sucesso"}
-        return {"sucesso": False, "erros": ["Produto não encontrado"]}
     except Exception as e:
-        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
-
-def editar_produto(id, nome=None, preco=None, quantidade=None):
-    try:
-        for i, produto in enumerate(produtos_db):
-            if produto['id'] == id:
-                erros = []
-                
-                # AQUI COLOCAMOS CASO JA EXISTA UM PRODUTO COM MESMO NOME, POIS NAO TEMOS DIFERENCIACAO COMO MARCA ETC.
-                if nome:
-                    for p in produtos_db:
-                        if p['nome'] == nome and p['id'] != id:
-                            erros.append("Já existe um produto com este nome")
-                        if re.search(r'\s{2,}', nome):
-                            erros.append("Nome do produto não pode conter espaços em branco consecutivos")
-                if preco:
-                    try:
-                        preco_float = float(preco)
-                        if preco_float <= 0:
-                            erros.append("Preço deve ser maior que zero")
-                    except ValueError:
-                        erros.append("Preço inválido")
-                
-                if quantidade:
-                    try:
-                        quatidade_int = int(quantidade)
-                        if quatidade_int <= 0:
-                            erros.append("Quantidade deve ser maior ou igual a zero")
-                    except ValueError:
-                        erros.append("Quantidade inválida")
-                
-                if erros:
-                    return {"sucesso": False, "erros": erros}
-                
-                if nome:
-                    produtos_db[i]['nome'] = nome
-                if preco:
-                    produtos_db[i]['preco'] = float(preco)
-                if quantidade:
-                    produtos_db[i]['quantidade'] = int(quantidade)
-                
-                if not nome and not preco and not quantidade:
-                    return {"sucesso": False, "erros": ["Nenhuma alteração realizada"]}
-                    
-                return {"sucesso": True, "mensagem": "\nProduto atualizado com sucesso"}
-        return {"sucesso": False, "erros": ["Produto não encontrado"]}
-    except Exception as e:
-        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
-
-def buscar_produto(nome=None, id=None):
-    try:
-        if nome:
-            for produto in produtos_db:
-                if produto['nome'] == nome:
-                    return {"sucesso": True, "produto": produto}
-        elif id:
-            for produto in produtos_db:
-                if produto['id'] == id:
-                    return {"sucesso": True, "produto": produto}
-        return {"sucesso": False, "erros": ["Produto não encontrado"]}
-    except Exception as e:
-        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
+        return {'sucesso': False, 'mensagem': f"Erro ao buscar o produto: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def listar_todos_produtos():
+    conn = None
+    cursor = None
     try:
-        if not produtos_db:
-            return {"sucesso": False, "erros": ["Nenhum produto cadastrado"]}
-        
-        print("\n=============== LISTA DE PRODUTOS ===============")
-        print("ID | NOME       | PREÇO  | QUANTIDADE(unidade(s))")
-        print("-------------------------------------------------")
-        
-        for produto in produtos_db:
-            nome_formatado = produto['nome']
-            preco_formatado = f"R$ {produto['preco']:.2f}"
-            print(f"{produto['id']}| {nome_formatado} | {preco_formatado} | {produto['quantidade']}")
-        
-        print("=================================================\n")
-        return {"sucesso": True, "mensagem": f"Total de {len(produtos_db)} produtos listados"}
-    
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        query = """
+            SELECT p.produto_id, p.nome, p.preco_venda, COALESCE(SUM(e.quantidade), 0) AS quantidade
+            FROM produtos p
+            LEFT JOIN entrada_produtos e ON p.produto_id = e.produto_id
+            GROUP BY p.produto_id, p.nome, p.preco_venda
+            ORDER BY p.produto_id;
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        produtos = []
+        for row in rows:
+            produtos.append({
+                'produto_id': row[0],
+                'nome': row[1],
+                'preco_venda': float(row[2]),
+                'quantidade': int(row[3])
+            })
+        return {'sucesso': True, 'produtos': produtos}
     except Exception as e:
-        print("Erro ao listar produtos")
-        return {"sucesso": False, "erros": [f"Erro inesperado: {str(e)}"]}
+        return {'sucesso': False, 'mensagem': f"Erro ao listar produtos: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
