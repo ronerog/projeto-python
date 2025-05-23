@@ -133,8 +133,7 @@ def menu_produtos_logado():
                 if resultado["sucesso"]:
                     print(resultado["mensagem"])
                 else:
-                    for erro in resultado["erros"]:
-                        print(f"Erro: {erro}")
+                        print(f"Erro: {resultado['mensagem']}")
             else:
                 print('Selecione uma opção válida')
                 
