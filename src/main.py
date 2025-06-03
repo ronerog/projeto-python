@@ -1,6 +1,6 @@
 from services.login_service import verificar_login
 from services.cadastro_service import cadastrar
-from services.produtos_service import listar_todos_produtos, buscar_produto, editar_produto, excluir_produto, cadastrar_produto
+from services.produtos_service import listar_todos_produtos, buscar_produto, editar_produto, excluir_produto, cadastrar_produto, adicionar_fornecedor, listar_fornecedores, excluir_fornecedor
 
 def inicio():
     login = False
@@ -56,6 +56,9 @@ def menu_produtos_logado():
         print("3 - Cadastrar novo produto")
         print("4 - Editar produto")
         print("5 - Excluir produto")
+        print("6 - Adicionar fornecedor")
+        print("7 - Listar fornecedores")
+        print("8 - Excluir fornecedor")
         print("0 - Voltar ao menu principal")
         
         try:
@@ -67,10 +70,12 @@ def menu_produtos_logado():
 
             elif opcao == 1:
                 resultado = listar_todos_produtos()
-                produtos = resultado["produtos"]
-                for produto in produtos:
-                    print(produto)
-                if resultado["sucesso"] is False:
+                
+                if resultado["sucesso"]:
+                    produtos = resultado["produtos"]
+                    for produto in produtos:
+                        print(produto)
+                else:
                     for erro in resultado["erros"]:
                         print(f"Erro: {erro}")
 
@@ -85,20 +90,27 @@ def menu_produtos_logado():
                         print(f"Nome: {produto['nome']}")
                         print(f"Preço: R$ {produto['preco_venda']:.2f}")
                         print(f"Quantidade: {produto['quantidade']} unidade(s)")
+                        fornecedor_id = produto.get('fornecedor_id')
+                        if fornecedor_id is not None:
+                            print(f"Fornecedor ID: {fornecedor_id}")
+                        else:
+                            print("Fornecedor ID: Não informado")
                 else:
-                    for erro in resultado["erros"]:
-                        print(f"Erro: {erro}")
+                    print(f"Erro: {resultado['mensagem']}")
 
             elif opcao == 3:
                 nome = input("Digite o nome do novo produto: ")
                 preco = input("Digite o preço do produto: ")
                 quantidade = input("Digite a quantidade do produto: ")
+                fornecedor_id = input("Digite o ID do fornecedor: ")
 
                 produto = {
-                        'nome': nome,
-                        'preco_venda': preco,
-                        'quantidade': quantidade
-                    }
+                    'nome': nome,
+                    'preco_venda': preco,
+                    'quantidade': quantidade,
+                    'fornecedor_id': int(fornecedor_id) if fornecedor_id.strip().isdigit() else None
+                }
+
 
                 resultado = cadastrar_produto(produto)
 
@@ -112,14 +124,29 @@ def menu_produtos_logado():
                 nome = input("Novo nome (deixe em branco para manter o atual): ")
                 preco = input("Novo preço (deixe em branco para manter o atual): ")
                 quantidade = input("Nova quantidade (deixe em branco para manter o atual): ")
+                fornecedor_id = input("Novo fornecedor (digite o ID ou deixe em branco): ")
 
                 novos_dados = {}
                 if nome.strip():
                     novos_dados['nome'] = nome
                 if preco.strip():
-                    novos_dados['preco_venda'] = float(preco)
+                    try:
+                        novos_dados['preco_venda'] = float(preco)
+                    except ValueError:
+                        print("Preço inválido.")
+                        return
                 if quantidade.strip():
-                    novos_dados['quantidade'] = int(quantidade)
+                    try:
+                        novos_dados['quantidade'] = int(quantidade)
+                    except ValueError:
+                        print("Quantidade inválida.")
+                        return
+                if fornecedor_id.strip():
+                    try:
+                        novos_dados['fornecedor_id'] = int(fornecedor_id)
+                    except ValueError:
+                        print("ID do fornecedor inválido.")
+                        return
 
                 resultado = editar_produto(id_produto, novos_dados)
                 if resultado["sucesso"]:
@@ -128,12 +155,48 @@ def menu_produtos_logado():
                     print(f"Erro: {resultado['mensagem']}")
 
             elif opcao == 5:
-                id = input("Digite o ID do produto que deseja excluir: ").strip()
+                id = input("Digite o ID do produto que deseja excluir: ")
                 resultado = excluir_produto(id)
                 if resultado["sucesso"]:
                     print(resultado["mensagem"])
                 else:
                         print(f"Erro: {resultado['mensagem']}")
+
+            elif opcao == 6:
+                nome_fornecedor = input("Digite o nome do fornecedor: ")
+                telefone = input("Digite o número de telefone (apenas números): ")
+                email = input("Digite o email: ")
+                cnpj = input("Digite o CNPJ (apenas números): ")
+
+                fornecedor = {
+                        'nome_fornecedor': nome_fornecedor,
+                        'telefone': telefone,
+                        'email': email,
+                        'cnpj': cnpj
+                    }
+
+                resultado = adicionar_fornecedor(fornecedor)
+
+                if not resultado["sucesso"]:
+                    print(f"Erro: {resultado['mensagem']}")
+
+            elif opcao == 7:
+                resultado = listar_fornecedores()
+                fornecedores = resultado["fornecedores"]
+                for fornecedor in fornecedores:
+                    print(fornecedor)
+                if resultado["sucesso"] is False:
+                    for erro in resultado["erros"]:
+                        print(f"Erro: {erro}")
+
+            elif opcao == 8:
+                id = input("Digite o ID do fornecedor que deseja excluir: ")
+                resultado = excluir_fornecedor(id)
+                if resultado["sucesso"]:
+                    print(resultado["mensagem"])
+                else:
+                        print(f"Erro: {resultado['mensagem']}")
+
             else:
                 print('Selecione uma opção válida')
                 

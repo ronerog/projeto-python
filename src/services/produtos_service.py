@@ -45,11 +45,19 @@ def cadastrar_produto(produto):
     if not validacao['sucesso']:
         return validacao
 
+    if 'fornecedor_id' not in produto:
+        return {'sucesso': False, 'mensagem': "O campo fornecedor_id é obrigatório."}
+
     conn = None
     cursor = None
     try:
         conn = criar_conexao()
         cursor = conn.cursor()
+
+        cursor.execute("SELECT 1 FROM fornecedores WHERE fornecedor_id = %s;", (produto['fornecedor_id'],))
+        if not cursor.fetchone():
+            return {'sucesso': False, 'mensagem': "Fornecedor não encontrado."}
+        
         query = """
             INSERT INTO produtos (nome, preco_venda)
             VALUES (%s, %s) RETURNING produto_id;
@@ -58,11 +66,12 @@ def cadastrar_produto(produto):
         produto_id = cursor.fetchone()[0]
 
         query_entrada = """
-            INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo)
-            VALUES (%s, %s, %s);
+            INSERT INTO entrada_produtos (produto_id, fornecedor_id, quantidade, preco_custo)
+            VALUES (%s, %s, %s, %s);
         """
         cursor.execute(query_entrada, (
             produto_id,
+            produto['fornecedor_id'],
             produto['quantidade'],
             produto['preco_venda']
         ))
@@ -148,10 +157,30 @@ def editar_produto(produto_id, novos_dados):
             quantidade = int(novos_dados['quantidade'])
             if quantidade < 0:
                 return {'sucesso': False, 'mensagem': "A quantidade não pode ser negativa."}
+
+            fornecedor_id = novos_dados.get('fornecedor_id')
+            if fornecedor_id is None:
+                return {'sucesso': False, 'mensagem': "Fornecedor não informado para nova quantidade."}
+
+            cursor.execute("SELECT * FROM fornecedores WHERE fornecedor_id = %s;", (fornecedor_id,))
+            if not cursor.fetchone():
+                return {'sucesso': False, 'mensagem': "Fornecedor não encontrado."}
+
             cursor.execute("""
-                INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo)
-                VALUES (%s, %s, 0);
-            """, (produto_id, quantidade))
+                INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo, fornecedor_id)
+                VALUES (%s, %s, 0, %s);
+            """, (produto_id, quantidade, fornecedor_id))
+
+        elif 'fornecedor_id' in novos_dados:
+            fornecedor_id = novos_dados['fornecedor_id']
+            cursor.execute("SELECT * FROM fornecedores WHERE fornecedor_id = %s;", (fornecedor_id,))
+            if not cursor.fetchone():
+                    return {'sucesso': False, 'mensagem': "Fornecedor não encontrado."}
+
+            cursor.execute("""
+                INSERT INTO entrada_produtos (produto_id, quantidade, preco_custo, fornecedor_id)
+                VALUES (%s, %s, 0, %s);
+            """, (produto_id, 0, fornecedor_id))
 
         conn.commit()
         return {'sucesso': True, 'mensagem': "Produto atualizado com sucesso."}
@@ -171,7 +200,9 @@ def buscar_produto(nome):
         conn = criar_conexao()
         cursor = conn.cursor()
         query = """
-            SELECT p.produto_id, p.nome, p.preco_venda, COALESCE(SUM(e.quantidade), 0) AS quantidade
+            SELECT p.produto_id, p.nome, p.preco_venda, 
+                   COALESCE(SUM(e.quantidade), 0) AS quantidade,
+                   MAX(e.fornecedor_id) AS fornecedor_id
             FROM produtos p
             LEFT JOIN entrada_produtos e ON p.produto_id = e.produto_id
             WHERE p.nome ILIKE %s
@@ -188,7 +219,8 @@ def buscar_produto(nome):
                 'produto_id': row[0],
                 'nome': row[1],
                 'preco_venda': float(row[2]),
-                'quantidade': int(row[3])
+                'quantidade': int(row[3]),
+                'fornecedor_id': row[4]
             })
         return {'sucesso': True, 'produtos': produtos}
 
@@ -200,32 +232,159 @@ def buscar_produto(nome):
         if conn:
             conn.close()
 
+
 def listar_todos_produtos():
     conn = None
     cursor = None
     try:
         conn = criar_conexao()
         cursor = conn.cursor()
-        query = """
-            SELECT p.produto_id, p.nome, p.preco_venda, COALESCE(SUM(e.quantidade), 0) AS quantidade
+
+        cursor.execute("""
+            SELECT p.produto_id, p.nome, p.preco_venda,
+                   COALESCE(SUM(e.quantidade), 0) AS quantidade_total,
+                   MAX(e.fornecedor_id) AS fornecedor_id
             FROM produtos p
             LEFT JOIN entrada_produtos e ON p.produto_id = e.produto_id
             GROUP BY p.produto_id, p.nome, p.preco_venda
             ORDER BY p.produto_id;
-        """
-        cursor.execute(query)
-        rows = cursor.fetchall()
+        """)
+
         produtos = []
-        for row in rows:
-            produtos.append({
+        for row in cursor.fetchall():
+            produto = {
                 'produto_id': row[0],
                 'nome': row[1],
                 'preco_venda': float(row[2]),
-                'quantidade': int(row[3])
-            })
+                'quantidade': row[3],
+                'fornecedor_id': row[4]
+            }
+            produtos.append(produto)
+
         return {'sucesso': True, 'produtos': produtos}
+
     except Exception as e:
-        return {'sucesso': False, 'mensagem': f"Erro ao listar produtos: {e}"}
+        return {'sucesso': False, 'erros': [str(e)]}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def validacao_fornecedor(fornecedor):
+    if not fornecedor.get('nome_fornecedor'):
+        return {'sucesso': False, 'mensagem': "O campo nome é obrigatório."}
+    if not isinstance(fornecedor.get('nome_fornecedor'), str) or fornecedor['nome_fornecedor'].strip() == "":
+        return {'sucesso': False, 'mensagem': "O nome do fornecedor não pode ser vazio."}
+    if 'telefone' not in fornecedor:
+        return {'sucesso': False, 'mensagem': "O campo telefone é obrigatório."}
+    try:
+        fone = int(fornecedor['telefone'])
+    except (ValueError, TypeError):
+        return {'sucesso': False, 'mensagem': "O campo telefone deve ser um número."}
+    if fone < 0:
+        return {'sucesso': False, 'mensagem': "O telefone é inválido."}
+    fone_str = str(fone)
+    if not fone_str.isdigit() and len(fone_str) == 11:
+        return {'sucesso': False, 'mensagem': "O telefone deve ter 11 digitos."}
+    if not fornecedor.get('email'):
+        return {'sucesso': False, 'mensagem': "O campo email é obrigatório."}
+    if not isinstance(fornecedor.get('email'), str) or fornecedor['email'].strip() == "":
+        return {'sucesso': False, 'mensagem': "O email não pode ser vazio."}
+    if 'cnpj' not in fornecedor:
+        return {'sucesso': False, 'mensagem': "O campo CNPJ é obrigatório."}
+    try:
+        pj = int(fornecedor['cnpj'])
+    except (ValueError, TypeError):
+        return {'sucesso': False, 'mensagem': "O campo CNPJ deve ser um número."}
+    if pj < 0:
+        return {'sucesso': False, 'mensagem': "O CNPJ é inválido."}
+    pj_str = str(pj)
+    if not pj_str.isdigit() and len(pj_str) == 14:
+        return {'sucesso': False, 'mensagem': "O CNPJ deve ter 14 digitos."}
+    
+    return {'sucesso': True}
+
+def adicionar_fornecedor(fornecedor):
+    validacao = validacao_fornecedor(fornecedor)
+    if not validacao['sucesso']:
+        return validacao
+    
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO fornecedores (nome, telefone, email, cnpj)
+            VALUES (%s, %s, %s, %s) RETURNING fornecedor_id;
+        """
+        cursor.execute(query, (fornecedor['nome_fornecedor'], fornecedor['telefone'], fornecedor['email'], fornecedor['cnpj']))
+        fornecedor_id = cursor.fetchone()[0]
+
+        conn.commit()
+        return {
+            'sucesso': True,
+            'mensagem': "Fornecedor cadastrado com sucesso.",
+            'fornecedor_id': fornecedor_id
+        }
+
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao cadastrar o fornecedor: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def listar_fornecedores():
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        query = """
+            SELECT f.fornecedor_id, f.nome, f.telefone, f.email, f.cnpj
+            FROM fornecedores f
+            GROUP BY f.fornecedor_id, f.nome, f.telefone, f.email, f.cnpj
+            ORDER BY f.fornecedor_id;
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        fornecedores = []
+        for row in rows:
+            fornecedores.append({
+                'fornecedor_id': row[0],
+                'nome': row[1],
+                'telefone': row[2],
+                'email': row[3],
+                'cnpj': row[4]
+            })
+        return {'sucesso': True, 'fornecedores': fornecedores}
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao listar fornecedores: {e}"}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+def excluir_fornecedor(fornecedor_id):
+    conn = None
+    cursor = None
+    try:
+        conn = criar_conexao()
+        cursor = conn.cursor()
+        cursor.execute("SELECT nome FROM fornecedores WHERE fornecedor_id = %s;", (fornecedor_id,))
+        resultado = cursor.fetchone()
+        if not resultado:
+            return {'sucesso': False, 'mensagem': "Fornecedor não encontrado."}
+        nome_fornecedor = resultado[0]
+        cursor.execute("DELETE FROM fornecedores WHERE fornecedor_id = %s;", (fornecedor_id,))
+        conn.commit()
+        return {'sucesso': True, 'mensagem': f"Fornecedor '{nome_fornecedor}' excluído com sucesso."}
+    except Exception as e:
+        return {'sucesso': False, 'mensagem': f"Erro ao excluir fornecedor: {e}"}
     finally:
         if cursor:
             cursor.close()
