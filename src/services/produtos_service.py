@@ -84,9 +84,14 @@ def cadastrar_produto(produto):
 
 
 def excluir_produto(produto_id):
+    
+    if not produto_id or not str(produto_id).isdigit():
+        return {'sucesso': False, 'mensagem': "ID do produto inválido. Por favor, informe um número inteiro."}
+    
     conn = None
     cursor = None
     try:
+        produto_id = int(produto_id)
         conn = criar_conexao()
         cursor = conn.cursor()
         cursor.execute("SELECT nome FROM produtos WHERE produto_id = %s;", (produto_id,))

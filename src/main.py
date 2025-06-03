@@ -128,8 +128,8 @@ def menu_produtos_logado():
                     print(f"Erro: {resultado['mensagem']}")
 
             elif opcao == 5:
-                nome = input("Digite o ID do produto que deseja excluir: ")
-                resultado = excluir_produto(nome)
+                id = input("Digite o ID do produto que deseja excluir: ").strip()
+                resultado = excluir_produto(id)
                 if resultado["sucesso"]:
                     print(resultado["mensagem"])
                 else:
