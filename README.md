@@ -2,6 +2,8 @@
 
 Um sistema simples para gerenciamento de usuários e produtos em Python.
 
+---
+
 ## Descrição
 
 Este projeto implementa um sistema de cadastro de usuários e gerenciamento de produtos via linha de comando (CLI). O sistema possui autenticação de usuários e funcionalidades completas de CRUD (Create, Read, Update, Delete) para produtos.
@@ -19,7 +21,7 @@ Este projeto implementa um sistema de cadastro de usuários e gerenciamento de p
 ### Produtos
 
 - Listar todos os produtos  
-- Buscar produtos por nome ou ID  
+- Buscar produtos por nome
 - Cadastrar novos produtos  
 - Editar produtos existentes  
 - Excluir produtos  
@@ -31,17 +33,24 @@ Este projeto implementa um sistema de cadastro de usuários e gerenciamento de p
 ```
 projeto/
 │
-├── src/
+├── setup/                  # Scripts para setup do ambiente e Docker
+│   └── docker/               
+│     ├── __init__.py
+│     ├── install.py          # Funcão para instalar e iniciar Docker via Winget no terminal
+│   ├── setup.py              # Entry-point de instalação via terminal
+│
+├── src/                    # Código-fonte principal
 │   ├── __init__.py
 │   ├── main.py              # Ponto de entrada do programa
 │   ├── login.py             # Funções de autenticação
 │   ├── cadastro.py          # Funções de cadastro de usuários
 │   ├── produtos.py          # Funções de gerenciamento de produtos
-│   │
 │   └── data/
 │       ├── usuarios.py      # Banco de dados de usuários
 │       └── produtos.py      # Banco de dados de produtos
 │
+├── venv/                   # Ambiente virtual
+├── docker-compose.yml
 ├── .gitignore
 └── README.md
 ```
@@ -50,18 +59,40 @@ projeto/
 
 ## Como Usar
 
-1. Clone o repositório  
-2. Navegue até a pasta do projeto  
-3. Execute o programa principal:
+### 🛠️ Passo a passo para rodar o sistema:
 
-```bash
-python -m src.main
-```
+1. **Ative o ambiente virtual:**
 
-4. Siga as instruções na interface de linha de comando:
-   - Faça login com um usuário existente ou crie um novo usuário  
-   - Acesse o menu de produtos após o login  
-   - Gerencie produtos conforme necessário  
+   ```powershell
+   .\venv\Scripts\Activate.ps1
+   ```
+
+2. **Instale os utilitários (caso esteja sem Docker instalado):**
+
+   ```powershell
+   cd setup
+   pip install .
+   install-docker
+   ```
+
+3. **Volte para o diretório principal e entre na pasta `src`:**
+
+   ```powershell
+   cd ..
+   cd src
+   ```
+
+4. **Suba os containers com Docker Compose:**
+
+   ```powershell
+   docker-compose up --build
+   ```
+
+5. **Acesse o container da aplicação e execute o programa:**
+
+   ```powershell
+   docker exec -it src-app-1 python main.py
+   ```
 
 ---
 
@@ -85,13 +116,13 @@ python -m src.main
 ### Produtos
 
 - Nome: mínimo 2 caracteres, não pode ser apenas números  
-- Preço: deve ser um valor numérico maior que zero
-- Quantdidade: deve ser um valor inteiro maior que zero    
+- Preço: deve ser um valor numérico maior que zero  
+- Quantidade: deve ser um valor inteiro maior que zero  
 
 ---
 
 ## Requisitos
 
-- Python 3.6 ou superior  
+- Docker
 
 ---
