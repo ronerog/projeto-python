@@ -56,7 +56,7 @@ def cadastrar_produto(produto):
 
         cursor.execute("SELECT 1 FROM fornecedores WHERE fornecedor_id = %s;", (produto['fornecedor_id'],))
         if not cursor.fetchone():
-            return {'sucesso': False, 'mensagem': "Fornecedor não encontrado."}
+            return {'sucesso': False, 'mensagem': "Fornecedor não encontrado. "}
         
         query = """
             INSERT INTO produtos (nome, preco_venda)
